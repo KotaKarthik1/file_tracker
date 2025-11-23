@@ -2,16 +2,16 @@
 import sys
 import json
 import os
-
+from awsglue import utils
+args = utils.getResolvedOptions(
+    sys.argv,
+    [
+        "n"
+    ]
+)
+n = args["n"]
 
 def main():
-    # Read input from Glue job arguments
-    n = os.environ.get('n', None)
-    try:
-        n = int(n)
-    except (TypeError, ValueError):
-        n = None
-
     trigger_lambda = False
     if n is not None:
         if n % 2 == 0:
