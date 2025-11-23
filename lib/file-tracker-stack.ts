@@ -94,7 +94,6 @@ export class FileTrackerStack extends cdk.Stack {
         scriptLocation: glueScriptS3Location,
       },
       defaultArguments: {
-        '--extra-py-files': '',
       },
       glueVersion: '3.0',
       numberOfWorkers: 2,
