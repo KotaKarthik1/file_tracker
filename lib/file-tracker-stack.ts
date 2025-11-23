@@ -20,7 +20,7 @@ export class FileTrackerStack extends cdk.Stack {
 
     // Upload glue-script.py to S3 bucket during deployment
     new s3deploy.BucketDeployment(this, 'GlueScriptDeployment', {
-      sources: [s3deploy.Source.asset('./src/glue-script.py')],
+      sources: [s3deploy.Source.asset('./src/glue-assets')],
       destinationBucket: glueScriptBucket,
       destinationKeyPrefix: '', // root of bucket
     });
@@ -94,36 +94,46 @@ export class FileTrackerStack extends cdk.Stack {
         scriptLocation: glueScriptS3Location,
       },
       defaultArguments: {
-        '--extra-py-files': '',
       },
       glueVersion: '3.0',
       numberOfWorkers: 2,
       workerType: 'Standard',
     });
 
-    // Step Function: Glue job, then Choice, then hi-lambda or finish
-    const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
-      glueJobName: glueJob.name!,
-      arguments: sfn.TaskInput.fromObject({}),
+    const glueTask = new tasks.GlueStartJobRun(this, "StartGlueJob", {
+      glueJobName: "DemoGlueJob",
+      arguments: sfn.TaskInput.fromObject({
+        "--n.$": "$.n"
+      }),
       integrationPattern: sfn.IntegrationPattern.RUN_JOB,
+      resultPath: "$.glueRaw"
     });
-
+    // LAMBDA TASK
     const lambdaTask = new tasks.LambdaInvoke(this, 'HiLambdaTask', {
       lambdaFunction: hiLambda,
-      outputPath: '$.Payload',
+      outputPath: "$.Payload"
     });
 
-    // Choice: If Glue output meets condition, run hi-lambda, else finish
-    const choice = new sfn.Choice(this, 'GlueResultChoice')
-      .when(sfn.Condition.booleanEquals('$.glueResult.triggerLambda', true), lambdaTask)
-      .otherwise(new sfn.Pass(this, 'Finish'));
+    // Choice step that:
+    // 1. Reads n from Glue output
+    // 2. Converts to number using intrinsic: States.StringToJson
+    // 3. Computes isEven using intrinsic: States.MathMod
+    const choice = new sfn.Choice(this, "CheckValue")
+      .when(
+        sfn.Condition.stringEquals("$.n", "2"),
+        lambdaTask
+      )
+      .otherwise(new sfn.Pass(this, "SkipLambda"));
 
+    // Final SFN Definition
     const definition = glueTask.next(choice);
+
 
     const stateMachine = new sfn.StateMachine(this, 'FileTrackerStateMachine', {
       definition,
       timeout: cdk.Duration.minutes(10),
     });
+
 
     // Grant SFN invoker Lambda permission to start the State Machine
     stateMachine.grantStartExecution(sfnInvokerLambda);
