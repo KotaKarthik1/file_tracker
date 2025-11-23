@@ -18,9 +18,9 @@ export class FileTrackerStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    // Upload glue-script.py to S3 bucket during deployment
+    // Upload glue-assets directory to S3 bucket during deployment
     new s3deploy.BucketDeployment(this, 'GlueScriptDeployment', {
-      sources: [s3deploy.Source.asset('./src/glue-script.py')],
+      sources: [s3deploy.Source.asset('./src/glue-assets')],
       destinationBucket: glueScriptBucket,
       destinationKeyPrefix: '', // root of bucket
     });
