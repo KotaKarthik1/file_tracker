@@ -3,6 +3,7 @@ import sys
 import json
 import os
 from awsglue import utils
+from awsglue import job
 args = utils.getResolvedOptions(
     sys.argv,
     [
@@ -24,7 +25,7 @@ def main():
         print("No valid 'n' provided. Not triggering Lambda.")
 
     # Output result for SFN (simulate)
-    print(json.dumps({"glueResult": {"triggerLambda": trigger_lambda}}))
-
+    # print(json.dumps({"glueResult": {"triggerLambda": trigger_lambda}}))
+    job.commit({"triggerLambda": trigger_lambda})
 if __name__ == "__main__":
     main()
