@@ -100,7 +100,7 @@ export class FileTrackerStack extends cdk.Stack {
       workerType: 'Standard',
     });
 
-    const glueTask = new sfnTasks.GlueStartJobRun(this, "StartGlueJob", {
+    const glueTask = new tasks.GlueStartJobRun(this, "StartGlueJob", {
       glueJobName: "DemoGlueJob",
       arguments: sfn.TaskInput.fromObject({
         "--n.$": "$.n"
