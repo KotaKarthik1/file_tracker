@@ -23,7 +23,7 @@ def main():
         print("No valid 'n' provided. Not triggering Lambda.")
 
     # Output result for SFN (simulate)
-    print(json.dumps({"triggerLambda": trigger_lambda}))
+    print(json.dumps({"glueResult": {"triggerLambda": trigger_lambda}}))
 
 if __name__ == "__main__":
     main()
