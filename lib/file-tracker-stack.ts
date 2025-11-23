@@ -100,10 +100,7 @@ export class FileTrackerStack extends cdk.Stack {
       workerType: 'Standard',
     });
 
-
-    // ---------------------------------------
-    // STEP FUNCTION – GLUE TASK
-    // ---------------------------------------
+    // GLUE TASK
     const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
       glueJobName: glueJob.name!,
       arguments: sfn.TaskInput.fromObject({
@@ -113,27 +110,31 @@ export class FileTrackerStack extends cdk.Stack {
       resultPath: "$.glueRaw"
     });
 
-    // ---------------------------------------
-    // STEP FUNCTION – CHOICE
-    // ---------------------------------------
+    // Compute n % 2
+    const computeEven = new sfn.Pass(this, "ComputeEven", {
+      parameters: {
+        "n.$": "$.n",
+        "isEven.$": "States.MathMod(States.StringToNumber($.n), 2)"
+      }
+    });
+
+    // LAMBDA TASK
     const lambdaTask = new tasks.LambdaInvoke(this, 'HiLambdaTask', {
       lambdaFunction: hiLambda,
       outputPath: "$.Payload"
     });
 
+    // CHOICE
     const choice = new sfn.Choice(this, 'CheckEven')
       .when(
-        sfn.Condition.numberEquals(
-          "States.MathMod(States.StringToNumber($.n), 2)",
-          0
-        ),
+        sfn.Condition.numberEquals('$.isEven', 0),
         lambdaTask
       )
       .otherwise(new sfn.Pass(this, 'Finish'));
 
+    // Final SFN Definition
+    const definition = glueTask.next(computeEven).next(choice);
 
-    // Flow: Start Glue → ComputeEven → Choice
-    const definition = glueTask.next(choice);
 
     const stateMachine = new sfn.StateMachine(this, 'FileTrackerStateMachine', {
       definition,
