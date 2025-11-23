@@ -118,7 +118,7 @@ export class FileTrackerStack extends cdk.Stack {
     // 1. Reads n from Glue output
     // 2. Converts to number using intrinsic: States.StringToJson
     // 3. Computes isEven using intrinsic: States.MathMod
-    const choice = new sfn.Choice(this, "CheckEven")
+    const choice = new sfn.Choice(this, "CheckValue")
       .when(
         sfn.Condition.stringEquals("$.n", "2"),
         lambdaTask
