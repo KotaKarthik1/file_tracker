@@ -101,7 +101,7 @@ export class FileTrackerStack extends cdk.Stack {
     });
 
 
- // ---------------------------------------
+    // ---------------------------------------
     // STEP FUNCTION – GLUE TASK
     // ---------------------------------------
     const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
@@ -114,17 +114,6 @@ export class FileTrackerStack extends cdk.Stack {
     });
 
     // ---------------------------------------
-    // STEP FUNCTION – COMPUTE EVEN
-    // (No S3 or Glue used for decision)
-    // ---------------------------------------
-    const computeEven = new sfn.Pass(this, "ComputeEven", {
-      parameters: {
-        "n.$": "$.n",
-        "isEven.$": "States.MathMod($.n, 2)"
-      }
-    });
-
-    // ---------------------------------------
     // STEP FUNCTION – CHOICE
     // ---------------------------------------
     const lambdaTask = new tasks.LambdaInvoke(this, 'HiLambdaTask', {
@@ -133,11 +122,18 @@ export class FileTrackerStack extends cdk.Stack {
     });
 
     const choice = new sfn.Choice(this, 'CheckEven')
-      .when(sfn.Condition.numberEquals('$.isEven', 0), lambdaTask)
+      .when(
+        sfn.Condition.numberEquals(
+          "States.MathMod(States.StringToNumber($.n), 2)",
+          0
+        ),
+        lambdaTask
+      )
       .otherwise(new sfn.Pass(this, 'Finish'));
 
+
     // Flow: Start Glue → ComputeEven → Choice
-    const definition = glueTask.next(computeEven).next(choice);
+    const definition = glueTask.next(choice);
 
     const stateMachine = new sfn.StateMachine(this, 'FileTrackerStateMachine', {
       definition,
