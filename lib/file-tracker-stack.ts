@@ -83,7 +83,7 @@ export class FileTrackerStack extends cdk.Stack {
         scriptLocation: glueScriptS3Location,
       },
       defaultArguments: {
-        '--extra-py-files': '',
+        // Removed '--extra-py-files' to fix Glue job launch error
       },
       glueVersion: '3.0',
       numberOfWorkers: 2,
@@ -94,7 +94,6 @@ export class FileTrackerStack extends cdk.Stack {
     const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
       glueJobName: glueJob.name!,
       arguments: sfn.TaskInput.fromObject({
-        '--extra-py-files': '',
         '--n': sfn.JsonPath.stringAt('$.n')
       }),
       integrationPattern: sfn.IntegrationPattern.RUN_JOB,
