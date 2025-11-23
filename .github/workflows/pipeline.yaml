@@ -23,6 +23,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install hi-lambda dependencies
+        run: npm install
+        working-directory: src/hi-lambda
+
+      - name: Install sfn-invoker-lambda dependencies
+        run: npm install
+        working-directory: src/sfn-invoker-lambda
+
       - name: Build
         run: npm run build
 

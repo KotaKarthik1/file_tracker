@@ -56,7 +56,7 @@ export class FileTrackerStack extends cdk.Stack {
     const hiLambda = new lambda.Function(this, 'HiLambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
-      code: lambda.Code.fromInline(`exports.handler = async () => { return 'hi'; };`),
+      code: lambda.Code.fromAsset('src/hi-lambda'),
       role: hiLambdaRole,
     });
 
@@ -64,18 +64,7 @@ export class FileTrackerStack extends cdk.Stack {
     const sfnInvokerLambda = new lambda.Function(this, 'SFNInvokerLambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-        const AWS = require('aws-sdk');
-        const sfn = new AWS.StepFunctions();
-        exports.handler = async (event) => {
-          const params = {
-            stateMachineArn: process.env.STATE_MACHINE_ARN,
-            input: JSON.stringify(event)
-          };
-          await sfn.startExecution(params).promise();
-          return { status: 'Started SFN' };
-        };
-      `),
+      code: lambda.Code.fromAsset('src/sfn-invoker-lambda'),
       environment: {
         STATE_MACHINE_ARN: 'TO_BE_REPLACED', // Will be replaced after StateMachine creation
       },
