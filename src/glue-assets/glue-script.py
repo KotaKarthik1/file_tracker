@@ -9,10 +9,11 @@ args = utils.getResolvedOptions(
         "n"
     ]
 )
-n = args["n"]
-
+c = args["n"]
 def main():
+    n = int(c)
     trigger_lambda = False
+    print(n, " is the value of n")
     if n is not None:
         if n % 2 == 0:
             trigger_lambda = True
