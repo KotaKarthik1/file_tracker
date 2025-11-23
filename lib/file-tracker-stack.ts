@@ -100,40 +100,36 @@ export class FileTrackerStack extends cdk.Stack {
       workerType: 'Standard',
     });
 
-    // GLUE TASK
-    const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
-      glueJobName: glueJob.name!,
+    const glueTask = new sfnTasks.GlueStartJobRun(this, "StartGlueJob", {
+      glueJobName: "DemoGlueJob",
       arguments: sfn.TaskInput.fromObject({
         "--n.$": "$.n"
       }),
       integrationPattern: sfn.IntegrationPattern.RUN_JOB,
       resultPath: "$.glueRaw"
     });
-
-    // Compute n % 2
-    const computeEven = new sfn.Pass(this, "ComputeEven", {
-      parameters: {
-        "n.$": "$.n",
-        "isEven.$": "States.MathMod(States.StringToNumber($.n), 2)"
-      }
-    });
-
     // LAMBDA TASK
     const lambdaTask = new tasks.LambdaInvoke(this, 'HiLambdaTask', {
       lambdaFunction: hiLambda,
       outputPath: "$.Payload"
     });
 
-    // CHOICE
-    const choice = new sfn.Choice(this, 'CheckEven')
+    // Choice step that:
+    // 1. Reads n from Glue output
+    // 2. Converts to number using intrinsic: States.StringToJson
+    // 3. Computes isEven using intrinsic: States.MathMod
+    const choice = new sfn.Choice(this, "CheckEven")
       .when(
-        sfn.Condition.numberEquals('$.isEven', 0),
-        lambdaTask
+        sfn.Condition.numberEquals(
+          "States.MathMod(States.StringToJson($.glueRaw.Arguments['--n']), 2)",
+          0
+        ),
+        lambdaTask // triggered only if even
       )
-      .otherwise(new sfn.Pass(this, 'Finish'));
+      .otherwise(new sfn.Pass(this, "Finish")); // odd → finish
 
     // Final SFN Definition
-    const definition = glueTask.next(computeEven).next(choice);
+    const definition = glueTask.next(choice);
 
 
     const stateMachine = new sfn.StateMachine(this, 'FileTrackerStateMachine', {
