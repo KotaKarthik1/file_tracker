@@ -18,9 +18,9 @@ export class FileTrackerStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    // Upload glue-assets directory to S3 bucket during deployment
+    // Upload glue-script.py to S3 bucket during deployment
     new s3deploy.BucketDeployment(this, 'GlueScriptDeployment', {
-      sources: [s3deploy.Source.asset('./src/glue-assets')],
+      sources: [s3deploy.Source.asset('./src/glue-script.py')],
       destinationBucket: glueScriptBucket,
       destinationKeyPrefix: '', // root of bucket
     });
@@ -56,7 +56,7 @@ export class FileTrackerStack extends cdk.Stack {
     const hiLambda = new lambda.Function(this, 'HiLambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('src/hi-lambda'),
+      code: lambda.Code.fromInline(`exports.handler = async () => { return 'hi'; };`),
       role: hiLambdaRole,
     });
 
@@ -64,7 +64,18 @@ export class FileTrackerStack extends cdk.Stack {
     const sfnInvokerLambda = new lambda.Function(this, 'SFNInvokerLambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('src/sfn-invoker-lambda'),
+      code: lambda.Code.fromInline(`
+        const AWS = require('aws-sdk');
+        const sfn = new AWS.StepFunctions();
+        exports.handler = async (event) => {
+          const params = {
+            stateMachineArn: process.env.STATE_MACHINE_ARN,
+            input: JSON.stringify(event)
+          };
+          await sfn.startExecution(params).promise();
+          return { status: 'Started SFN' };
+        };
+      `),
       environment: {
         STATE_MACHINE_ARN: 'TO_BE_REPLACED', // Will be replaced after StateMachine creation
       },
@@ -83,7 +94,7 @@ export class FileTrackerStack extends cdk.Stack {
         scriptLocation: glueScriptS3Location,
       },
       defaultArguments: {
-        // Removed '--extra-py-files' to fix Glue job launch error
+        '--extra-py-files': '',
       },
       glueVersion: '3.0',
       numberOfWorkers: 2,
@@ -93,10 +104,9 @@ export class FileTrackerStack extends cdk.Stack {
     // Step Function: Glue job, then Choice, then hi-lambda or finish
     const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
       glueJobName: glueJob.name!,
-      arguments: sfn.TaskInput.fromObject({
-        '--n': sfn.JsonPath.stringAt('$.n')
-      }),
+      arguments: sfn.TaskInput.fromObject({}),
       integrationPattern: sfn.IntegrationPattern.RUN_JOB,
+      resultPath: "$.glueRaw"
     });
 
     const lambdaTask = new tasks.LambdaInvoke(this, 'HiLambdaTask', {
@@ -106,9 +116,8 @@ export class FileTrackerStack extends cdk.Stack {
 
     // Choice: If Glue output meets condition, run hi-lambda, else finish
     const choice = new sfn.Choice(this, 'GlueResultChoice')
-      .when(sfn.Condition.booleanEquals('$.glueResult.triggerLambda', true), lambdaTask)
-      .otherwise(new sfn.Pass(this, 'Finish'));
-
+  .when(sfn.Condition.booleanEquals('$.glueRaw.JobRunStateDetails.Output.triggerLambda', true), lambdaTask)
+  .otherwise(new sfn.Pass(this, 'Finish'));
     const definition = glueTask.next(choice);
 
     const stateMachine = new sfn.StateMachine(this, 'FileTrackerStateMachine', {
