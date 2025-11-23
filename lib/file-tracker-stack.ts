@@ -103,7 +103,9 @@ export class FileTrackerStack extends cdk.Stack {
     // Step Function: Glue job, then Choice, then hi-lambda or finish
     const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
       glueJobName: glueJob.name!,
-      arguments: sfn.TaskInput.fromObject({}),
+      arguments: sfn.TaskInput.fromObject({
+        "--n.$": "$.n"
+      }),
       integrationPattern: sfn.IntegrationPattern.RUN_JOB,
       resultPath: "$.glueRaw"
     });
