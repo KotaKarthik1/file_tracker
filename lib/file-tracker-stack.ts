@@ -100,7 +100,10 @@ export class FileTrackerStack extends cdk.Stack {
       workerType: 'Standard',
     });
 
-    // Step Function: Glue job, then Choice, then hi-lambda or finish
+
+ // ---------------------------------------
+    // STEP FUNCTION – GLUE TASK
+    // ---------------------------------------
     const glueTask = new tasks.GlueStartJobRun(this, 'GlueTask', {
       glueJobName: glueJob.name!,
       arguments: sfn.TaskInput.fromObject({
@@ -110,21 +113,37 @@ export class FileTrackerStack extends cdk.Stack {
       resultPath: "$.glueRaw"
     });
 
-    const lambdaTask = new tasks.LambdaInvoke(this, 'HiLambdaTask', {
-      lambdaFunction: hiLambda,
-      outputPath: '$.Payload',
+    // ---------------------------------------
+    // STEP FUNCTION – COMPUTE EVEN
+    // (No S3 or Glue used for decision)
+    // ---------------------------------------
+    const computeEven = new sfn.Pass(this, "ComputeEven", {
+      parameters: {
+        "n.$": "$.n",
+        "isEven.$": "States.MathMod($.n, 2)"
+      }
     });
 
-    // Choice: If Glue output meets condition, run hi-lambda, else finish
-    const choice = new sfn.Choice(this, 'GlueResultChoice')
-  .when(sfn.Condition.booleanEquals('$.glueRaw.JobRunStateDetails.Output.triggerLambda', true), lambdaTask)
-  .otherwise(new sfn.Pass(this, 'Finish'));
-    const definition = glueTask.next(choice);
+    // ---------------------------------------
+    // STEP FUNCTION – CHOICE
+    // ---------------------------------------
+    const lambdaTask = new tasks.LambdaInvoke(this, 'HiLambdaTask', {
+      lambdaFunction: hiLambda,
+      outputPath: "$.Payload"
+    });
+
+    const choice = new sfn.Choice(this, 'CheckEven')
+      .when(sfn.Condition.numberEquals('$.isEven', 0), lambdaTask)
+      .otherwise(new sfn.Pass(this, 'Finish'));
+
+    // Flow: Start Glue → ComputeEven → Choice
+    const definition = glueTask.next(computeEven).next(choice);
 
     const stateMachine = new sfn.StateMachine(this, 'FileTrackerStateMachine', {
       definition,
       timeout: cdk.Duration.minutes(10),
     });
+
 
     // Grant SFN invoker Lambda permission to start the State Machine
     stateMachine.grantStartExecution(sfnInvokerLambda);
